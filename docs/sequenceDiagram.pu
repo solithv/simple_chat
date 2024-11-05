@@ -1,0 +1,33 @@
+@startuml sequenceDiagram
+    participant Client
+    participant Server
+    participant Storage
+
+    '  WebSocket接続確立
+    Note over Client,Server: 接続
+    Client->>Server: WebSocket接続要求
+    Server-->>Client: 接続確立
+
+    '  Room選択
+    Server->>Client: Room一覧
+    Client->>Server: Room選択
+    Storage->>Server: メッセージ読み込み
+    Server->>Client: メッセージ履歴
+
+    '  チャットメッセージ送信
+    Note over Client,Server: チャット送信
+    Client->>Server: チャットメッセージ送信
+    Server->>Storage: メッセージ保存
+    Server->>Client: メッセージをブロードキャスト
+
+    '  ファイル送信プロセス
+    Note over Client,Server: ファイル送信
+    Client->>Server: ファイル送信
+    Server->>Storage: ファイル保存
+    Server->>Client: ファイルダウンロードリンクをブロードキャスト
+
+    '  切断プロセス
+    Note over Client,Server: 切断
+    Client->>Server: 切断要求
+    Server-->>Client: 切断完了
+@enduml
