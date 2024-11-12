@@ -10,6 +10,7 @@ from libs import storage
 
 
 def create_app():
+    """flask初期化"""
     app = Flask(__name__)
 
     CORS(app, resources={"/*": {"origins": "*"}})
@@ -17,7 +18,9 @@ def create_app():
     app.json.sort_keys = False
     app.json.ensure_ascii = False
 
-    socketio = SocketIO(app, cors_allowed_origins="*")
+    socketio = SocketIO(
+        app, cors_allowed_origins="*", max_http_buffer_size=config.MAX_BUFFER_SIZE
+    )
 
     app.register_blueprint(http_module)
     register_socket_routes(socketio)
