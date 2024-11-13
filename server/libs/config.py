@@ -14,5 +14,4 @@ class AppConfig:
 
 DATABASE = os.getenv("DATABASE", "storage.db")
 MAX_BUFFER_SIZE = os.getenv("MAX_BUFFER_SIZE", 1024**2 * 10)
-
 JOIN_MESSAGES = os.getenv("JOIN_MESSAGES", 10)

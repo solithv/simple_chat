@@ -8,13 +8,13 @@ def get_available_rooms(conn):
     """部屋一覧を取得"""
     available_rooms = conn.execute(
         """
-            SELECT r.name, COUNT(j.id) as count
-            FROM rooms r
-            INNER JOIN joins j ON r.id = j.room_id
-            WHERE r.is_active = true
-            GROUP BY r.name
-            ORDER BY count DESC
-            """
+        SELECT r.name, COUNT(j.id) as count
+        FROM rooms r
+        INNER JOIN joins j ON r.id = j.room_id
+        WHERE r.is_active = true
+        GROUP BY r.name
+        ORDER BY count DESC
+        """
     ).fetchall()
     available_rooms = [dict(room) for room in available_rooms]
     return available_rooms
@@ -59,7 +59,7 @@ def register_socket_routes(socketio: SocketIO):
             print(f"disconnect {client and dict(client)}")
             if room["join_count"] <= 1:
                 conn.execute(
-                    "UPDATE rooms SET is_active=false WHERE id = ?", (room["id"],)
+                    "UPDATE rooms SET is_active = false WHERE id = ?", (room["id"],)
                 )
             conn.execute("DELETE FROM joins WHERE user_id = ?", (client["id"],))
             sys_user = conn.execute(
@@ -160,6 +160,13 @@ def register_socket_routes(socketio: SocketIO):
             (room["id"], client["id"]),
         )
         conn.execute("UPDATE rooms SET is_active = true WHERE id = ?", (room["id"],))
+        sys_user = conn.execute(
+            "SELECT * FROM users WHERE name = ?", ("system",)
+        ).fetchone()
+        conn.execute(
+            "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
+            (room["id"], sys_user["id"], f"{client['name']} has entered the room."),
+        )
         messages = conn.execute(
             """
             SELECT u.name as user, m.message, m.timestamp FROM messages m
@@ -171,13 +178,6 @@ def register_socket_routes(socketio: SocketIO):
             """,
             (room["id"], JOIN_MESSAGES),
         ).fetchall()
-        sys_user = conn.execute(
-            "SELECT * FROM users WHERE name = ?", ("system",)
-        ).fetchone()
-        conn.execute(
-            "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
-            (room["id"], sys_user["id"], f"{client['name']} has entered the room."),
-        )
         conn.commit()
 
         leave_room("sys_lobby")
@@ -219,7 +219,9 @@ def register_socket_routes(socketio: SocketIO):
         ).fetchone()
         if room["join_count"] <= 1:
             # 部屋が空になる
-            conn.execute("UPDATE rooms SET is_active=false WHERE id = ?", (room["id"],))
+            conn.execute(
+                "UPDATE rooms SET is_active = false WHERE id = ?", (room["id"],)
+            )
         conn.execute("DELETE FROM joins WHERE user_id = ?", (client["id"],))
         sys_user = conn.execute(
             "SELECT * FROM users WHERE name = ?", ("system",)

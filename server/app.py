@@ -1,12 +1,10 @@
 from flask import Flask
 from flask_cors import CORS
 from flask_socketio import SocketIO
-
-from libs import config
+from libs import config, storage
 from libs.args import args
 from libs.routes.http import http_module
 from libs.routes.ws import register_socket_routes
-from libs import storage
 
 
 def create_app():

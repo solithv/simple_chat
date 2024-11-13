@@ -1,11 +1,11 @@
 import sqlite3
+
 from libs.config import DATABASE
 
 
 def get_db():
     """DB接続"""
     conn = sqlite3.connect(DATABASE)
-    conn.autocommit
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -84,8 +84,8 @@ def init_db():
         """
     )
     conn.execute("DELETE FROM joins")
-    conn.execute("UPDATE rooms SET is_active=false")
-    conn.execute("UPDATE users SET is_active=false")
+    conn.execute("UPDATE rooms SET is_active = false")
+    conn.execute("UPDATE users SET is_active = false")
     sys_user = conn.execute(
         "SELECT * FROM users WHERE name = ?", ("system",)
     ).fetchone()
