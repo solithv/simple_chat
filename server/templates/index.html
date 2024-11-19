@@ -9,9 +9,14 @@
 </head>
 
 <body>
-    <div id="lobby">
+    <div id="username-form">
+        <h2>ユーザー名を入力</h2>
+        <input type="text" id="username" placeholder="ユーザー名">
+        <button onclick="connect()">接続</button>
+    </div>
+
+    <div id="lobby" style="display: none;">
         <h2>ロビー</h2>
-        <input type="text" id="username" placeholder="ユーザー名を入力">
         <button onclick="createRoom()">新しいルームを作成</button>
         <ul id="room-list"></ul>
     </div>
@@ -29,7 +34,7 @@
     <script src="https://cdn.socket.io/4.8.0/socket.io.min.js"
         integrity="sha384-OoIbkvzsFFQAG88r+IqMAjyOtYDPGO0cqK5HF5Uosdy/zUEGySeAzytENMDynREd"
         crossorigin="anonymous"></script>
-    <script src="app.js"></script>
+    <script src="static/app.js"></script>
 </body>
 
 </html>
