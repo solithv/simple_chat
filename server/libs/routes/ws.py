@@ -2,8 +2,9 @@ import sqlite3
 
 from flask import request
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
-from libs.config import JOIN_MESSAGES, MAX_FILES, LOG_SYSTEM
-from libs.storage import transact
+from libs.config import JOIN_MESSAGES, LOG_SYSTEM
+from libs.routes.http import generate_link
+from libs.storage import cursor_transact, decode_file, transact
 
 
 @transact
@@ -87,7 +88,6 @@ def register_socket_routes(socketio: SocketIO):
         conn.execute(
             "UPDATE users SET is_active = false WHERE socket_id = ?", (request.sid,)
         )
-        conn.commit()
 
     @socketio.on("join")
     @transact
@@ -116,14 +116,12 @@ def register_socket_routes(socketio: SocketIO):
                     "UPDATE users SET socket_id = ?, is_active = true WHERE name = ?",
                     (request.sid, data["name"]),
                 )
-                conn.commit()
             else:
                 # ユーザ新規登録
                 conn.execute(
                     "INSERT INTO users (name, socket_id) VALUES (?, ?)",
                     (data["name"], request.sid),
                 )
-                conn.commit()
                 client = conn.execute(
                     "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
                 ).fetchone()
@@ -152,7 +150,6 @@ def register_socket_routes(socketio: SocketIO):
         if not room:
             # ルームを作成
             conn.execute("INSERT INTO rooms (name) VALUES (?)", (data["room"],))
-            conn.commit()
             room = conn.execute(
                 "SELECT id FROM rooms WHERE name = ?", (data["room"],)
             ).fetchone()
@@ -182,7 +179,6 @@ def register_socket_routes(socketio: SocketIO):
             """,
             (room["id"], JOIN_MESSAGES),
         ).fetchall()
-        conn.commit()
 
         leave_room("sys_lobby")
         join_room(str(room["id"]))
@@ -235,7 +231,6 @@ def register_socket_routes(socketio: SocketIO):
                 "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
                 (room["id"], sys_user["id"], f"{client['name']} has leaved the room."),
             )
-        conn.commit()
 
         leave_room(str(room["id"]))
         join_room("sys_lobby")
@@ -250,55 +245,89 @@ def register_socket_routes(socketio: SocketIO):
     @socketio.on("message")
     @transact
     def handle_message(conn: sqlite3.Connection, data):
-        """メッセージ受信"""
-        client = conn.execute(
-            "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
-        ).fetchone()
-        room = conn.execute(
-            """
-            SELECT r.id
-            FROM rooms r
-            INNER JOIN joins j ON r.id = j.room_id
-            INNER JOIN users u ON j.user_id = u.id
-            WHERE u.socket_id = ? AND r.is_active = true
-            """,
-            (request.sid,),
-        ).fetchone()
-        if data.get("message"):
-            # テキストメッセージ
-            conn.execute(
+        """テキストメッセージ受信"""
+        with cursor_transact(conn) as cur:
+            client = cur.execute(
+                "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
+            ).fetchone()
+            room = cur.execute(
+                """
+                SELECT r.id
+                FROM rooms r
+                INNER JOIN joins j ON r.id = j.room_id
+                INNER JOIN users u ON j.user_id = u.id
+                WHERE u.socket_id = ? AND r.is_active = true
+                """,
+                (request.sid,),
+            ).fetchone()
+            cur.execute(
                 "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
                 (room["id"], client["id"], data["message"]),
             )
-            conn.commit()
             emit(
                 "message",
                 {"user": client["name"], "message": data["message"]},
                 to=str(room["id"]),
             )
-        if data.get("image"):
-            # 画像
-            conn.execute(
+
+    @socketio.on("image")
+    @transact
+    def handle_image(conn: sqlite3.Connection, data):
+        """画像受信"""
+        with cursor_transact(conn) as cur:
+            client = cur.execute(
+                "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
+            ).fetchone()
+            room = cur.execute(
+                """
+                SELECT r.id
+                FROM rooms r
+                INNER JOIN joins j ON r.id = j.room_id
+                INNER JOIN users u ON j.user_id = u.id
+                WHERE u.socket_id = ? AND r.is_active = true
+                """,
+                (request.sid,),
+            ).fetchone()
+            cur.execute(
                 "INSERT INTO images (room_id, user_id, image) VALUES (?, ?, ?)",
                 (room["id"], client["id"], data["image"]),
             )
-            conn.commit()
             emit(
                 "message",
                 {"user": client["name"], "image": data["image"]},
                 to=str(room["id"]),
             )
-        if data.get("file"):
-            # ファイル
-            # TODO: httpでのfile downloadリンク生成処理
-            link = None
-            conn.execute(
-                "INSERT INTO files (room_id, user_id, file) VALUES (?, ?, ?)",
-                (room["id"], client["id"], data["file"]),
+
+    @socketio.on("file")
+    @transact
+    def handle_file(conn: sqlite3.Connection, data):
+        """ファイル受信"""
+        with cursor_transact(conn) as cur:
+            client = cur.execute(
+                "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
+            ).fetchone()
+            room = cur.execute(
+                """
+                SELECT r.id
+                FROM rooms r
+                INNER JOIN joins j ON r.id = j.room_id
+                INNER JOIN users u ON j.user_id = u.id
+                WHERE u.socket_id = ? AND r.is_active = true
+                """,
+                (request.sid,),
+            ).fetchone()
+
+            file_id = cur.lastrowid
+            file_path = decode_file(data["file_data"], data["filename"], file_id)
+            cur.execute(
+                "INSERT INTO files (room_id, user_id, filename, save_name) VALUES (?, ?, ?)",
+                (room["id"], client["id"], data["filename"], file_path),
             )
-            conn.commit()
+            link = generate_link(file_path)
             emit(
                 "message",
-                {"user": client["name"], "file": link},
+                {"user": client["name"], "filename": data["filename"], "link": link},
                 to=str(room["id"]),
             )
+
+        cur.close()
