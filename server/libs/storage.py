@@ -1,7 +1,10 @@
+import base64
+from contextlib import contextmanager
+import os
 import sqlite3
 from functools import wraps
 
-from libs.config import DATABASE
+from libs.config import DATABASE, FILE_FOLDER
 
 
 def get_db():
@@ -27,6 +30,15 @@ def transact(func):
             conn.close()
 
     return wrapper
+
+
+@contextmanager
+def cursor_transact(conn: sqlite3.Connection):
+    try:
+        cursor = conn.cursor()
+        yield cursor
+    finally:
+        cursor.close()
 
 
 @transact
@@ -154,7 +166,9 @@ def init_db(conn: sqlite3.Connection):
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             room_id INTEGER NOT NULL,
             user_id INTEGER NOT NULL,
-            file TEXT NOT NULL,
+            filename TEXT NOT NULL,
+            save_name TEXT NOT NULL,
+            is_available BOOLEAN NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL DEFAULT (DATETIME('now', 'localtime')),
             updated_at TEXT NOT NULL DEFAULT (DATETIME('now', 'localtime')),
             FOREIGN KEY (room_id) REFERENCES rooms (id),
@@ -176,3 +190,16 @@ def init_db(conn: sqlite3.Connection):
     conn.execute("UPDATE users SET is_active = false")
     conn.execute("INSERT OR IGNORE INTO users (name) VALUES (?)", ("system",))
     conn.commit()
+
+
+def decode_file(encoded: str, filename: str, id: int):
+    decoded = base64.b64decode(encoded.split(",")[1])
+    file_path = os.path.join(FILE_FOLDER, f"{id}_{filename}")
+    with open(file_path, "wb") as f:
+        f.write(decoded)
+    return file_path
+
+
+def init():
+    init_db()
+    os.makedirs(FILE_FOLDER, exist_ok=True)

@@ -16,6 +16,11 @@ def main():
 def get_file(conn: sqlite3.Connection, id: int):
     """ファイルダウンロード"""
     file = conn.execute("SELECT * FROM files WHERE id = ?", (id,)).fetchone()
-    file_path = f"/files/{file['file']}"
+    file_path = file["save_name"]
 
     return send_file(file_path, download_name=file.file)
+
+
+def generate_link(file_path: str):
+    # TODO: download link generate
+    file_path
