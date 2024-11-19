@@ -81,6 +81,7 @@ def register_socket_routes(socketio: SocketIO):
                 {"user": "system", "message": f"{client['name']} has leaved the room."},
                 to=str(room["id"]),
             )
+            conn.commit()
             available_rooms = get_available_rooms()
             emit("rooms", available_rooms, to="sys_lobby")
 
@@ -191,6 +192,7 @@ def register_socket_routes(socketio: SocketIO):
             {"user": "system", "message": f"{client['name']} has entered the room."},
             to=str(room["id"]),
         )
+        conn.commit()
         available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to="sys_lobby")
 
@@ -239,6 +241,7 @@ def register_socket_routes(socketio: SocketIO):
             {"user": "system", "message": f"{client['name']} has leaved the room."},
             to=str(room["id"]),
         )
+        conn.commit()
         available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to="sys_lobby")
 
@@ -320,7 +323,7 @@ def register_socket_routes(socketio: SocketIO):
             file_id = cur.lastrowid
             file_path = decode_file(data["file_data"], data["filename"], file_id)
             cur.execute(
-                "INSERT INTO files (room_id, user_id, filename, save_name) VALUES (?, ?, ?)",
+                "INSERT INTO files (room_id, user_id, filename, save_name) VALUES (?, ?, ?, ?)",
                 (room["id"], client["id"], data["filename"], file_path),
             )
             link = generate_link(file_path)
