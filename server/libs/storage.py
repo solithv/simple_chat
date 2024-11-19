@@ -1,10 +1,10 @@
 import base64
-from contextlib import contextmanager
 import os
 import sqlite3
+from contextlib import contextmanager
 from functools import wraps
 
-from libs.config import DATABASE, FILE_FOLDER
+from libs.config import DATABASE, FILE_FOLDER, MAX_FILES, SYSTEM_USER
 
 
 def get_db():
@@ -169,7 +169,6 @@ def init_db(conn: sqlite3.Connection):
             filename TEXT NOT NULL,
             save_name TEXT,
             link TEXT,
-            is_available BOOLEAN NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL DEFAULT (DATETIME('now', 'localtime')),
             updated_at TEXT NOT NULL DEFAULT (DATETIME('now', 'localtime')),
             FOREIGN KEY (room_id) REFERENCES rooms (id),
@@ -189,7 +188,7 @@ def init_db(conn: sqlite3.Connection):
     conn.execute("DELETE FROM joins")
     conn.execute("UPDATE rooms SET is_active = false")
     conn.execute("UPDATE users SET is_active = false")
-    conn.execute("INSERT OR IGNORE INTO users (name) VALUES (?)", ("system",))
+    conn.execute("INSERT OR IGNORE INTO users (name) VALUES (?)", (SYSTEM_USER,))
     conn.commit()
 
 
@@ -198,9 +197,38 @@ def decode_file(encoded: str, filename: str, id: int):
     file_path = os.path.join(FILE_FOLDER, f"{id}_{filename}")
     with open(file_path, "wb") as f:
         f.write(decoded)
+    delete_limited_files()
     return file_path
+
+
+@transact
+def delete_limited_files(conn: sqlite3.Connection):
+    delete_files = conn.execute(
+        """
+        SELECT id, save_name
+        FROM files
+        WHERE id NOT IN (
+            SELECT id
+            FROM (
+                SELECT id
+                FROM files
+                ORDER BY created_at DESC
+                LIMIT ?
+            )
+        )
+        ORDER BY created_at ASC
+        """,
+        (MAX_FILES,),
+    ).fetchall()
+    for file in delete_files:
+        try:
+            os.remove(file["save_name"])
+            conn.execute("DELETE FROM files WHERE id = ?", (file["id"],))
+        except Exception:
+            pass
 
 
 def init():
     init_db()
     os.makedirs(FILE_FOLDER, exist_ok=True)
+    delete_limited_files()
