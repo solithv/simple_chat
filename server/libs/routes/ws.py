@@ -3,7 +3,6 @@ import sqlite3
 from flask import request
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
 from libs.config import JOIN_MESSAGES, LOG_SYSTEM
-from libs.routes.http import generate_link
 from libs.storage import cursor_transact, decode_file, transact
 
 
@@ -26,8 +25,35 @@ def get_available_rooms(conn: sqlite3.Connection):
 
 def register_socket_routes(socketio: SocketIO):
     @socketio.on("connect")
-    def handle_connect():
+    @transact
+    def handle_connect(conn: sqlite3.Connection):
         """接続処理"""
+        name = request.args.get("name")
+        if name is None:
+            emit("error", {"message": "name is required."})
+            disconnect()
+        client = conn.execute("SELECT * FROM users WHERE name = ?", (name,)).fetchone()
+        if client:
+            # DBに同一ユーザ名の登録がある
+            if client["is_active"]:
+                # すでに接続されているユーザ名の時は切断
+                emit(
+                    "error",
+                    {"message": f"username {name} is already used."},
+                )
+                disconnect()
+                return
+            conn.execute(
+                "UPDATE users SET socket_id = ?, is_active = true WHERE name = ?",
+                (request.sid, name),
+            )
+        else:
+            # ユーザ新規登録
+            conn.execute(
+                "INSERT INTO users (name, socket_id) VALUES (?, ?)",
+                (name, request.sid),
+            )
+
         available_rooms = get_available_rooms()
         join_room("sys_lobby")  # ロビー
         emit("rooms", available_rooms)
@@ -97,54 +123,6 @@ def register_socket_routes(socketio: SocketIO):
         client = conn.execute(
             "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
         ).fetchone()
-        if not client:
-            # 新規接続
-            print("not client")
-            client = conn.execute(
-                "SELECT * FROM users WHERE name = ?", (data["name"],)
-            ).fetchone()
-            if client:
-                # DBに同一ユーザ名の登録がある
-                if client["is_active"]:
-                    # すでに接続されているユーザ名の時は切断
-                    emit(
-                        "error",
-                        {"message": f"username {data['name']} is already used."},
-                    )
-                    disconnect()
-                    return
-                conn.execute(
-                    "UPDATE users SET socket_id = ?, is_active = true WHERE name = ?",
-                    (request.sid, data["name"]),
-                )
-            else:
-                # ユーザ新規登録
-                conn.execute(
-                    "INSERT INTO users (name, socket_id) VALUES (?, ?)",
-                    (data["name"], request.sid),
-                )
-                client = conn.execute(
-                    "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
-                ).fetchone()
-        elif client["name"] != data["name"]:
-            # ユーザ名変更
-            print("change name")
-            exists_client = conn.execute(
-                "SELECT * FROM users WHERE name = ? AND is_active = true",
-                (data["name"],),
-            ).fetchone()
-            if exists_client:
-                emit("error", {"message": f"username {data['name']} is already used."})
-                disconnect()
-                return
-            conn.execute(
-                "UPDATE users SET is_active = false WHERE name = ?", (client["name"],)
-            )
-            conn.execute(
-                "UPDATE users SET name = ?, is_active = true WHERE socket_id = ?",
-                (data["name"], request.sid),
-            )
-
         room = conn.execute(
             "SELECT id FROM rooms WHERE name = ?", (data["room"],)
         ).fetchone()
@@ -170,23 +148,56 @@ def register_socket_routes(socketio: SocketIO):
             )
         messages = conn.execute(
             """
-            SELECT u.name as user, m.message, m.updated_at
-            FROM messages m
-            INNER JOIN rooms r ON m.room_id = r.id
-            INNER JOIN users u ON m.user_id = u.id
-            WHERE r.id = ?
-            ORDER BY m.updated_at DESC
+            WITH combined_data AS (
+                SELECT
+                    u.name AS user,
+                    m.message,
+                    NULL AS image,
+                    NULL AS filename,
+                    NULL AS link,
+                    m.updated_at
+                FROM messages m
+                JOIN users u ON m.user_id = u.id
+                WHERE m.room_id = ?
+
+                UNION ALL
+
+                SELECT
+                    u.name AS user,
+                    NULL AS message,
+                    i.image,
+                    NULL AS filename,
+                    NULL AS link,
+                    i.updated_at
+                FROM images i
+                JOIN users u ON i.user_id = u.id
+                WHERE i.room_id = ?
+
+                UNION ALL
+
+                SELECT
+                    u.name AS user,
+                    NULL AS message,
+                    NULL AS image,
+                    f.filename,
+                    f.link,
+                    f.updated_at
+                FROM files f
+                JOIN users u ON f.user_id = u.id
+                WHERE f.room_id = ?
+            )
+            SELECT user, message, image, filename, link
+            FROM combined_data
+            ORDER BY updated_at DESC
             LIMIT ?
             """,
-            (room["id"], JOIN_MESSAGES),
+            (room["id"], room["id"], room["id"], JOIN_MESSAGES),
         ).fetchall()
+        conn.commit()
 
         leave_room("sys_lobby")
         join_room(str(room["id"]))
-        emit(
-            "joined",
-            [dict(message) for message in messages[::-1]],
-        )
+        [emit("message", dict(m)) for m in messages[::-1]]
         emit(
             "message",
             {"user": "system", "message": f"{client['name']} has entered the room."},
@@ -320,13 +331,17 @@ def register_socket_routes(socketio: SocketIO):
                 (request.sid,),
             ).fetchone()
 
+            cur.execute(
+                "INSERT INTO files (room_id, user_id, filename) VALUES (?, ?, ?)",
+                (room["id"], client["id"], data["filename"]),
+            )
             file_id = cur.lastrowid
             file_path = decode_file(data["file_data"], data["filename"], file_id)
+            link = f"/files/{file_id}/{data['filename']}"
             cur.execute(
-                "INSERT INTO files (room_id, user_id, filename, save_name) VALUES (?, ?, ?, ?)",
-                (room["id"], client["id"], data["filename"], file_path),
+                "UPDATE files SET save_name = ?, link = ?, is_available = 1 WHERE id = ?",
+                (file_path, link, file_id),
             )
-            link = generate_link(file_path)
             emit(
                 "message",
                 {"user": client["name"], "filename": data["filename"], "link": link},
