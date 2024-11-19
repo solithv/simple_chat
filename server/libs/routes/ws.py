@@ -1,10 +1,13 @@
+import sqlite3
+
 from flask import request
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
-from libs.config import JOIN_MESSAGES
-from libs.storage import get_db
+from libs.config import JOIN_MESSAGES, MAX_FILES, LOG_SYSTEM
+from libs.storage import transact
 
 
-def get_available_rooms(conn):
+@transact
+def get_available_rooms(conn: sqlite3.Connection):
     """部屋一覧を取得"""
     available_rooms = conn.execute(
         """
@@ -24,16 +27,14 @@ def register_socket_routes(socketio: SocketIO):
     @socketio.on("connect")
     def handle_connect():
         """接続処理"""
-        conn = get_db()
-        available_rooms = get_available_rooms(conn)
+        available_rooms = get_available_rooms()
         join_room("sys_lobby")  # ロビー
         emit("rooms", available_rooms)
 
     @socketio.on("disconnect")
-    def handle_disconnect():
+    @transact
+    def handle_disconnect(conn: sqlite3.Connection):
         """切断処理"""
-        conn = get_db()
-
         client = conn.execute(
             "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
         ).fetchone()
@@ -62,23 +63,24 @@ def register_socket_routes(socketio: SocketIO):
                     "UPDATE rooms SET is_active = false WHERE id = ?", (room["id"],)
                 )
             conn.execute("DELETE FROM joins WHERE user_id = ?", (client["id"],))
-            sys_user = conn.execute(
-                "SELECT * FROM users WHERE name = ?", ("system",)
-            ).fetchone()
-            conn.execute(
-                "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
-                (
-                    room["id"],
-                    sys_user["id"],
-                    f"{client['name']} has leaved the room.",
-                ),
-            )
+            if LOG_SYSTEM:
+                sys_user = conn.execute(
+                    "SELECT id FROM users WHERE name = ?", ("system",)
+                ).fetchone()
+                conn.execute(
+                    "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
+                    (
+                        room["id"],
+                        sys_user["id"],
+                        f"{client['name']} has leaved the room.",
+                    ),
+                )
             emit(
                 "message",
                 {"user": "system", "message": f"{client['name']} has leaved the room."},
                 to=str(room["id"]),
             )
-            available_rooms = get_available_rooms(conn)
+            available_rooms = get_available_rooms()
             emit("rooms", available_rooms, to="sys_lobby")
 
         leave_room("sys_lobby")
@@ -88,9 +90,9 @@ def register_socket_routes(socketio: SocketIO):
         conn.commit()
 
     @socketio.on("join")
-    def handle_join(data):
+    @transact
+    def handle_join(conn: sqlite3.Connection, data):
         """部屋に参加"""
-        conn = get_db()
         client = conn.execute(
             "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
         ).fetchone()
@@ -160,20 +162,22 @@ def register_socket_routes(socketio: SocketIO):
             (room["id"], client["id"]),
         )
         conn.execute("UPDATE rooms SET is_active = true WHERE id = ?", (room["id"],))
-        sys_user = conn.execute(
-            "SELECT * FROM users WHERE name = ?", ("system",)
-        ).fetchone()
-        conn.execute(
-            "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
-            (room["id"], sys_user["id"], f"{client['name']} has entered the room."),
-        )
+        if LOG_SYSTEM:
+            sys_user = conn.execute(
+                "SELECT id FROM users WHERE name = ?", ("system",)
+            ).fetchone()
+            conn.execute(
+                "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
+                (room["id"], sys_user["id"], f"{client['name']} has entered the room."),
+            )
         messages = conn.execute(
             """
-            SELECT u.name as user, m.message, m.timestamp FROM messages m
+            SELECT u.name as user, m.message, m.updated_at
+            FROM messages m
             INNER JOIN rooms r ON m.room_id = r.id
             INNER JOIN users u ON m.user_id = u.id
             WHERE r.id = ?
-            ORDER BY m.timestamp DESC
+            ORDER BY m.updated_at DESC
             LIMIT ?
             """,
             (room["id"], JOIN_MESSAGES),
@@ -191,13 +195,13 @@ def register_socket_routes(socketio: SocketIO):
             {"user": "system", "message": f"{client['name']} has entered the room."},
             to=str(room["id"]),
         )
-        available_rooms = get_available_rooms(conn)
+        available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to="sys_lobby")
 
     @socketio.on("leave")
-    def handle_leave():
+    @transact
+    def handle_leave(conn: sqlite3.Connection):
         """部屋から退出"""
-        conn = get_db()
         client = conn.execute(
             "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
         ).fetchone()
@@ -223,13 +227,14 @@ def register_socket_routes(socketio: SocketIO):
                 "UPDATE rooms SET is_active = false WHERE id = ?", (room["id"],)
             )
         conn.execute("DELETE FROM joins WHERE user_id = ?", (client["id"],))
-        sys_user = conn.execute(
-            "SELECT * FROM users WHERE name = ?", ("system",)
-        ).fetchone()
-        conn.execute(
-            "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
-            (room["id"], sys_user["id"], f"{client['name']} has leaved the room."),
-        )
+        if LOG_SYSTEM:
+            sys_user = conn.execute(
+                "SELECT id FROM users WHERE name = ?", ("system",)
+            ).fetchone()
+            conn.execute(
+                "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
+                (room["id"], sys_user["id"], f"{client['name']} has leaved the room."),
+            )
         conn.commit()
 
         leave_room(str(room["id"]))
@@ -239,13 +244,13 @@ def register_socket_routes(socketio: SocketIO):
             {"user": "system", "message": f"{client['name']} has leaved the room."},
             to=str(room["id"]),
         )
-        available_rooms = get_available_rooms(conn)
+        available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to="sys_lobby")
 
     @socketio.on("message")
-    def handle_message(data):
+    @transact
+    def handle_message(conn: sqlite3.Connection, data):
         """メッセージ受信"""
-        conn = get_db()
         client = conn.execute(
             "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
         ).fetchone()

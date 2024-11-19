@@ -1,5 +1,7 @@
+import sqlite3
+
 from flask import Blueprint, jsonify, send_file
-from libs.storage import get_db
+from libs.storage import transact
 
 http_module = Blueprint("http_routes", __name__)
 
@@ -10,9 +12,9 @@ def main():
 
 
 @http_module.get("/files/<int:id>")
-def get_file(id: int):
+@transact
+def get_file(conn: sqlite3.Connection, id: int):
     """ファイルダウンロード"""
-    conn = get_db()
     file = conn.execute("SELECT * FROM files WHERE id = ?", (id,)).fetchone()
     file_path = f"/files/{file['file']}"
 
