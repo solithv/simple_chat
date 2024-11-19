@@ -29,7 +29,7 @@ def create_app():
 app, socketio = create_app()
 
 if __name__ == "__main__":
-    storage.init_db()
+    storage.init()
     socketio.run(
         app, host="0.0.0.0" if args.host else None, port=args.port, debug=args.debug
     )
