@@ -10,7 +10,7 @@ function connect() {
     }
 
     // Socket.IOの接続をユーザー名付きで確立
-    socket = io('http://localhost:5000', {
+    socket = io('/', {
         query: { name: username }
     });
 
