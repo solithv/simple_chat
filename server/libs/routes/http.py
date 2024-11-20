@@ -20,8 +20,10 @@ def test_client():
 @transact
 def get_file(conn: sqlite3.Connection, id: int, filename: str):
     """ファイルダウンロード"""
-    file = conn.execute("SELECT * FROM files WHERE id = ?", (id,)).fetchone()
-    if file is None or filename != file["filename"]:
+    file = conn.execute(
+        "SELECT * FROM files WHERE id = ? AND filename = ?", (id, filename)
+    ).fetchone()
+    if file is None:
         abort(404)
     file_path = file["save_name"]
 

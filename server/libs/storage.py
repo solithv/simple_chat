@@ -189,7 +189,6 @@ def init_db(conn: sqlite3.Connection):
     conn.execute("UPDATE rooms SET is_active = false")
     conn.execute("UPDATE users SET is_active = false")
     conn.execute("INSERT OR IGNORE INTO users (name) VALUES (?)", (SYSTEM_USER,))
-    conn.commit()
 
 
 def decode_file(encoded: str, filename: str, id: int):
