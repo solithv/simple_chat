@@ -90,24 +90,18 @@ def register_socket_routes(socketio: SocketIO):
                     "UPDATE rooms SET is_active = false WHERE id = ?", (room["id"],)
                 )
             conn.execute("DELETE FROM joins WHERE user_id = ?", (client["id"],))
+            message = f"{client['name']} has leaved the room."
             if LOG_SYSTEM:
                 sys_user = conn.execute(
                     "SELECT id FROM users WHERE name = ?", (SYSTEM_USER,)
                 ).fetchone()
                 conn.execute(
                     "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
-                    (
-                        room["id"],
-                        sys_user["id"],
-                        f"{client['name']} has leaved the room.",
-                    ),
+                    (room["id"], sys_user["id"], message),
                 )
             emit(
                 "message",
-                {
-                    "user": SYSTEM_USER,
-                    "message": f"{client['name']} has leaved the room.",
-                },
+                {"user": SYSTEM_USER, "message": message},
                 to=str(room["id"]),
             )
             conn.commit()
@@ -126,6 +120,7 @@ def register_socket_routes(socketio: SocketIO):
         if data["room"] == SYSTEM_LOBBY:
             emit("error", {"message": f"{SYSTEM_LOBBY} is used by system."})
             disconnect()
+            return
         client = conn.execute(
             "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
         ).fetchone()
@@ -144,13 +139,14 @@ def register_socket_routes(socketio: SocketIO):
             (room["id"], client["id"]),
         )
         conn.execute("UPDATE rooms SET is_active = true WHERE id = ?", (room["id"],))
+        message = f"{client['name']} has entered the room."
         if LOG_SYSTEM:
             sys_user = conn.execute(
                 "SELECT id FROM users WHERE name = ?", (SYSTEM_USER,)
             ).fetchone()
             conn.execute(
                 "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
-                (room["id"], sys_user["id"], f"{client['name']} has entered the room."),
+                (room["id"], sys_user["id"], message),
             )
         messages = conn.execute(
             """
@@ -204,11 +200,7 @@ def register_socket_routes(socketio: SocketIO):
         leave_room(SYSTEM_LOBBY)
         join_room(str(room["id"]))
         [emit("message", dict(m)) for m in messages[::-1]]
-        emit(
-            "message",
-            {"user": SYSTEM_USER, "message": f"{client['name']} has entered the room."},
-            to=str(room["id"]),
-        )
+        emit("message", {"user": SYSTEM_USER, "message": message}, to=str(room["id"]))
         conn.commit()
         available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to=SYSTEM_LOBBY)
@@ -242,22 +234,19 @@ def register_socket_routes(socketio: SocketIO):
                 "UPDATE rooms SET is_active = false WHERE id = ?", (room["id"],)
             )
         conn.execute("DELETE FROM joins WHERE user_id = ?", (client["id"],))
+        message = f"{client['name']} has leaved the room."
         if LOG_SYSTEM:
             sys_user = conn.execute(
                 "SELECT id FROM users WHERE name = ?", (SYSTEM_USER,)
             ).fetchone()
             conn.execute(
                 "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
-                (room["id"], sys_user["id"], f"{client['name']} has leaved the room."),
+                (room["id"], sys_user["id"], message),
             )
 
         leave_room(str(room["id"]))
         join_room(SYSTEM_LOBBY)
-        emit(
-            "message",
-            {"user": SYSTEM_USER, "message": f"{client['name']} has leaved the room."},
-            to=str(room["id"]),
-        )
+        emit("message", {"user": SYSTEM_USER, "message": message}, to=str(room["id"]))
         conn.commit()
         available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to=SYSTEM_LOBBY)
