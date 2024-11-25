@@ -285,91 +285,54 @@ def register_socket_routes(socketio: SocketIO):
                 """,
                 (request.sid,),
             ).fetchone()
-            cur.execute(
-                "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
-                (room["id"], client["id"], data["message"]),
-            )
-            emit(
-                "message",
-                {
-                    "user": client["name"],
-                    "message": data["message"],
-                    "timestamp": timestamp(data),
-                },
-                to=str(room["id"]),
-            )
-
-    @socketio.on("image")
-    @transact
-    def handle_image(conn: sqlite3.Connection, data):
-        """画像受信"""
-        with cursor_transact(conn) as cur:
-            client = cur.execute(
-                "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
-            ).fetchone()
-            room = cur.execute(
-                """
-                SELECT r.id
-                FROM rooms r
-                INNER JOIN joins j ON r.id = j.room_id
-                INNER JOIN users u ON j.user_id = u.id
-                WHERE u.socket_id = ? AND r.is_active = true
-                """,
-                (request.sid,),
-            ).fetchone()
-            cur.execute(
-                "INSERT INTO images (room_id, user_id, image) VALUES (?, ?, ?)",
-                (room["id"], client["id"], data["image"]),
-            )
-            emit(
-                "message",
-                {
-                    "user": client["name"],
-                    "image": data["image"],
-                    "timestamp": timestamp(data),
-                },
-                to=str(room["id"]),
-            )
-
-    @socketio.on("file")
-    @transact
-    def handle_file(conn: sqlite3.Connection, data):
-        """ファイル受信"""
-        with cursor_transact(conn) as cur:
-            client = cur.execute(
-                "SELECT * FROM users WHERE socket_id = ?", (request.sid,)
-            ).fetchone()
-            room = cur.execute(
-                """
-                SELECT r.id
-                FROM rooms r
-                INNER JOIN joins j ON r.id = j.room_id
-                INNER JOIN users u ON j.user_id = u.id
-                WHERE u.socket_id = ? AND r.is_active = true
-                """,
-                (request.sid,),
-            ).fetchone()
-
-            cur.execute(
-                "INSERT INTO files (room_id, user_id, filename) VALUES (?, ?, ?)",
-                (room["id"], client["id"], data["filename"]),
-            )
-            file_id = cur.lastrowid
-            file_path = decode_file(data["file_data"], data["filename"], file_id)
-            link = f"/files/{file_id}/{data['filename']}"
-            cur.execute(
-                "UPDATE files SET save_name = ?, link = ? WHERE id = ?",
-                (file_path, link, file_id),
-            )
-            emit(
-                "message",
-                {
-                    "user": client["name"],
-                    "filename": data["filename"],
-                    "link": link,
-                    "timestamp": timestamp(data),
-                },
-                to=str(room["id"]),
-            )
-
-        cur.close()
+            data = dict(data)
+            if data.get("message"):
+                cur.execute(
+                    "INSERT INTO messages (room_id, user_id, message) VALUES (?, ?, ?)",
+                    (room["id"], client["id"], data["message"]),
+                )
+                emit(
+                    "message",
+                    {
+                        "user": client["name"],
+                        "message": data["message"],
+                        "timestamp": timestamp(data),
+                    },
+                    to=str(room["id"]),
+                )
+            if data.get("image"):
+                cur.execute(
+                    "INSERT INTO images (room_id, user_id, image) VALUES (?, ?, ?)",
+                    (room["id"], client["id"], data["image"]),
+                )
+                emit(
+                    "message",
+                    {
+                        "user": client["name"],
+                        "image": data["image"],
+                        "timestamp": timestamp(data),
+                    },
+                    to=str(room["id"]),
+                )
+            if data.get("filename") and data.get("file_data"):
+                cur.execute(
+                    "INSERT INTO files (room_id, user_id, filename) VALUES (?, ?, ?)",
+                    (room["id"], client["id"], data["filename"]),
+                )
+                file_id = cur.lastrowid
+                file_path = decode_file(data["file_data"], data["filename"], file_id)
+                link = f"/files/{file_id}/{data['filename']}"
+                cur.execute(
+                    "UPDATE files SET save_name = ?, link = ? WHERE id = ?",
+                    (file_path, link, file_id),
+                )
+                emit(
+                    "message",
+                    {
+                        "user": client["name"],
+                        "filename": data["filename"],
+                        "link": link,
+                        "timestamp": timestamp(data),
+                    },
+                    to=str(room["id"]),
+                )
