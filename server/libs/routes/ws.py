@@ -1,9 +1,17 @@
 import sqlite3
+from datetime import datetime
 
 from flask import request
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
 from libs.config import JOIN_MESSAGES, LOG_SYSTEM, SYSTEM_LOBBY, SYSTEM_USER
 from libs.storage import cursor_transact, decode_file, transact
+
+
+def timestamp(data=None):
+    if data:
+        data = dict(data)
+        return data.get("timestamp", datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
 
 @transact
@@ -101,7 +109,7 @@ def register_socket_routes(socketio: SocketIO):
                 )
             emit(
                 "message",
-                {"user": SYSTEM_USER, "message": message},
+                {"user": SYSTEM_USER, "message": message, "timestamp": timestamp()},
                 to=str(room["id"]),
             )
             conn.commit()
@@ -188,7 +196,7 @@ def register_socket_routes(socketio: SocketIO):
                 JOIN users u ON f.user_id = u.id
                 WHERE f.room_id = ?
             )
-            SELECT user, message, image, filename, link
+            SELECT user, message, image, filename, link, updated_at AS timestamp
             FROM combined_data
             ORDER BY updated_at DESC
             LIMIT ?
@@ -200,7 +208,11 @@ def register_socket_routes(socketio: SocketIO):
         leave_room(SYSTEM_LOBBY)
         join_room(str(room["id"]))
         [emit("message", dict(m)) for m in messages[::-1]]
-        emit("message", {"user": SYSTEM_USER, "message": message}, to=str(room["id"]))
+        emit(
+            "message",
+            {"user": SYSTEM_USER, "message": message, "timestamp": timestamp()},
+            to=str(room["id"]),
+        )
         conn.commit()
         available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to=SYSTEM_LOBBY)
@@ -246,7 +258,11 @@ def register_socket_routes(socketio: SocketIO):
 
         leave_room(str(room["id"]))
         join_room(SYSTEM_LOBBY)
-        emit("message", {"user": SYSTEM_USER, "message": message}, to=str(room["id"]))
+        emit(
+            "message",
+            {"user": SYSTEM_USER, "message": message, "timestamp": timestamp()},
+            to=str(room["id"]),
+        )
         conn.commit()
         available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to=SYSTEM_LOBBY)
@@ -275,7 +291,11 @@ def register_socket_routes(socketio: SocketIO):
             )
             emit(
                 "message",
-                {"user": client["name"], "message": data["message"]},
+                {
+                    "user": client["name"],
+                    "message": data["message"],
+                    "timestamp": timestamp(data),
+                },
                 to=str(room["id"]),
             )
 
@@ -303,7 +323,11 @@ def register_socket_routes(socketio: SocketIO):
             )
             emit(
                 "message",
-                {"user": client["name"], "image": data["image"]},
+                {
+                    "user": client["name"],
+                    "image": data["image"],
+                    "timestamp": timestamp(data),
+                },
                 to=str(room["id"]),
             )
 
@@ -339,7 +363,12 @@ def register_socket_routes(socketio: SocketIO):
             )
             emit(
                 "message",
-                {"user": client["name"], "filename": data["filename"], "link": link},
+                {
+                    "user": client["name"],
+                    "filename": data["filename"],
+                    "link": link,
+                    "timestamp": timestamp(data),
+                },
                 to=str(room["id"]),
             )
 
