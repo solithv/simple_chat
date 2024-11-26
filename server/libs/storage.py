@@ -192,7 +192,7 @@ def init_db(conn: sqlite3.Connection):
 
 
 def decode_file(encoded: str, filename: str, id: int):
-    decoded = base64.b64decode(encoded.split(",")[1])
+    decoded = base64.b64decode(encoded.split(",")[-1])
     file_path = os.path.join(FILE_FOLDER, f"{id}_{filename}")
     with open(file_path, "wb") as f:
         f.write(decoded)
