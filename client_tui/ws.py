@@ -2,13 +2,14 @@ import base64
 from pathlib import Path
 
 import socketio
+import socketio.exceptions
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"}
 
 
 class SimpleChatWSManager:
     def __init__(self, url: str = "http://127.0.0.1:5000", username: str = None):
-        self.sio = socketio.AsyncClient()
+        self.sio = socketio.Client()
         self.url = url
         self.username = username
 
@@ -17,6 +18,10 @@ class SimpleChatWSManager:
     def setup_socket_handlers(self):
         """受信イベント定義"""
         # TODO: クライアントの仕様に合わせて変更
+
+        @self.sio.on("disconnect")
+        def on_disconnect():
+            raise socketio.exceptions.DisconnectedError("Disconnected from server.")
 
         @self.sio.on("rooms")
         def on_rooms(data):
