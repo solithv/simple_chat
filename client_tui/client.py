@@ -451,8 +451,10 @@ class ChatApp(App):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("-u", "--url", default="http://localhost:5000")
-    parser.add_argument("-n", "--name")
+    parser.add_argument(
+        "-u", "--url", default="http://localhost:5000", help="server url"
+    )
+    parser.add_argument("-n", "--name", help="default username")
     args = parser.parse_args()
 
     app = ChatApp(url=args.url, username=args.name)
