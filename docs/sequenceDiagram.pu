@@ -9,7 +9,6 @@
     Server-->>Client: 接続確立
 
     '  Room選択
-    Note over Client,Server: チャットルーム選択
     Server->>Client: Room一覧
     Client->>Server: Room選択
     Storage->>Server: メッセージ読み込み
@@ -20,12 +19,6 @@
     Client->>Server: チャットメッセージ送信
     Server->>Storage: メッセージ保存
     Server->>Client: メッセージをブロードキャスト
-
-    '  画像送信
-    Note over Client,Server: 画像送信
-    Client->>Server: 画像送信
-    Server->>Storage: 画像保存
-    Server->>Client: 画像をブロードキャスト
 
     '  ファイル送信プロセス
     Note over Client,Server: ファイル送信

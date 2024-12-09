@@ -16,7 +16,7 @@ from textual.containers import Container, ScrollableContainer
 from textual.message import Message as TextualMessage
 from textual.reactive import reactive
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, Select, Static
+from textual.widgets import Input, Label, Select, Static
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"}
 
@@ -174,33 +174,18 @@ class RoomSelector(Screen):
     def compose(self) -> ComposeResult:
         yield Container(
             Label("チャットルームを選択するか、新しいルーム名を入力してください:"),
-            Container(
-                *[
-                    Button(room["name"], id=f"room-{room['name']}")
-                    for room in self.rooms
-                ],
-                id="room-buttons",
+            Select(
+                ((room["name"], room["name"]) for room in self.rooms), id="room-select"
             ),
             Input(placeholder="新しいルーム名", id="new-room"),
             id="room-selector-container",
         )
 
-    def watch_rooms(self, rooms) -> None:
-        """roomsが更新されたときにボタンを更新"""
-        if self.is_mounted:
-            button_container = self.query_one("#room-buttons")
-            button_container.remove_children()
-            for room in rooms:
-                button_container.mount(Button(room["name"], id=f"room-{room['name']}"))
-
-    async def on_button_pressed(self, event: Button.Pressed) -> None:
-        """ルームボタンが押されたときの処理"""
-        await self.app.join_room(str(event.button.label))
+    async def on_select_changed(self, event: Select.Changed) -> None:
+        await self.app.join_room(event.value)
 
     async def on_input_submitted(self, event: Input.Submitted) -> None:
-        """新しいルーム名が入力されたときの処理"""
-        if event.value.strip():
-            await self.app.join_room(event.value)
+        await self.app.join_room(event.value)
 
 
 class ChatRoom(Screen):

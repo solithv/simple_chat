@@ -27,10 +27,10 @@ class SimpleChatWSManager:
         def on_rooms(data):
             return [room["name"] for room in data]
 
-        # @self.sio.on("message")
-        # def on_message(data):
+        @self.sio.on("message")
+        def on_message(data):
 
-        #     return data
+            return data
 
     def connect(self):
         """接続処理"""
@@ -65,13 +65,3 @@ class SimpleChatWSManager:
 
     def __del__(self):
         self.disconnect()
-
-
-class TK:
-    def __init__(self):
-        self.manager = SimpleChatWSManager()
-
-    def setup(self):
-        @self.manager.sio.on("some")
-        def on_some(data):
-            self.data = data
