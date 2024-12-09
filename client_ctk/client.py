@@ -105,7 +105,7 @@ class App(customtkinter.CTk):
             widget.destroy()
         self.activeWidgets.clear()
 
-        alert = Alert(text="接続が切断されました", title="Error", font=self.master.font)
+        alert = Alert(text="接続が切断されました", title="Error", font=self.font)
         alert.wait()
 
         """名前決めさせる画面表示"""
