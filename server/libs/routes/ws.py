@@ -38,7 +38,7 @@ def register_socket_routes(socketio: SocketIO):
         """接続処理"""
         name = request.args.get("name")
         if name is None:
-            emit("error", {"message": "name is required."})
+            emit("error", {"code": "MISSING_NAME", "message": "name is required."})
             disconnect()
         client = conn.execute("SELECT * FROM users WHERE name = ?", (name,)).fetchone()
         if client:
@@ -47,7 +47,10 @@ def register_socket_routes(socketio: SocketIO):
                 # すでに接続されているユーザ名の時は切断
                 emit(
                     "error",
-                    {"message": f"username {name} is already used."},
+                    {
+                        "code": "USED_NAME",
+                        "message": f'username "{name}" is already used.',
+                    },
                 )
                 disconnect()
                 return

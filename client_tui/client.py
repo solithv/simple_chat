@@ -16,7 +16,7 @@ from textual.containers import Container, ScrollableContainer
 from textual.message import Message as TextualMessage
 from textual.reactive import reactive
 from textual.screen import Screen
-from textual.widgets import Button, Input, Label, Select, Static
+from textual.widgets import Button, Input, Label, Static
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff"}
 
@@ -354,9 +354,31 @@ class ChatApp(App):
                 message_log.mount(message)
                 message_log.scroll_end(animate=False)
 
+        @self.sio.on("error")
+        async def on_error(data):
+            self.notify(data.get("message"), severity="error")
+            if data.get("code") in {"USED_NAME", "MISSING_NAME"}:
+                await self.sio.disconnect()
+                self.push_screen("login")
+
+        @self.sio.on("disconnect")
+        async def on_disconnect():
+            self.notify("disconnect by server", severity="error")
+            await self.sio.disconnect()
+            self.push_screen("login")
+
+        @self.sio.on("connect_error")
+        async def on_connect_error():
+            self.notify("connect error", severity="error")
+            await self.sio.disconnect()
+            self.push_screen("login")
+
     async def connect_to_server(self):
         """サーバーへの接続"""
         try:
+            if self.sio.connected:
+                await self.sio.disconnect()
+                self.sio.connected = False
             await self.sio.connect(f"{self.url}?name={self.username}")
             await self.push_screen("room_selector")
         except Exception as e:
