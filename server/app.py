@@ -31,5 +31,9 @@ app, socketio = create_app()
 if __name__ == "__main__":
     storage.init()
     socketio.run(
-        app, host="0.0.0.0" if args.host else None, port=args.port, debug=args.debug
+        app,
+        host="0.0.0.0" if args.host else None,
+        port=args.port,
+        debug=args.debug,
+        allow_unsafe_werkzeug=True,
     )
