@@ -3,7 +3,7 @@ from datetime import datetime
 
 from flask import request
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
-from libs.config import JOIN_MESSAGES, LOG_SYSTEM, SYSTEM_LOBBY, SYSTEM_USER
+from libs.config import JOIN_MESSAGES, LOG_SYSTEM, PREFIX, SYSTEM_LOBBY, SYSTEM_USER
 from libs.storage import cursor_transact, decode_file, transact
 
 
@@ -32,7 +32,7 @@ def get_available_rooms(conn: sqlite3.Connection):
 
 
 def register_socket_routes(socketio: SocketIO):
-    @socketio.on("connect")
+    @socketio.on("connect", namespace=f"{PREFIX}/")
     @transact
     def handle_connect(conn: sqlite3.Connection):
         """接続処理"""
@@ -66,7 +66,7 @@ def register_socket_routes(socketio: SocketIO):
         join_room(SYSTEM_LOBBY)  # ロビー
         emit("rooms", available_rooms)
 
-    @socketio.on("disconnect")
+    @socketio.on("disconnect", namespace=f"{PREFIX}/")
     @transact
     def handle_disconnect(conn: sqlite3.Connection):
         """切断処理"""
@@ -121,7 +121,7 @@ def register_socket_routes(socketio: SocketIO):
             "UPDATE users SET is_active = false WHERE socket_id = ?", (request.sid,)
         )
 
-    @socketio.on("join")
+    @socketio.on("join", namespace=f"{PREFIX}/")
     @transact
     def handle_join(conn: sqlite3.Connection, data):
         """部屋に参加"""
@@ -217,7 +217,7 @@ def register_socket_routes(socketio: SocketIO):
         available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to=SYSTEM_LOBBY)
 
-    @socketio.on("leave")
+    @socketio.on("leave", namespace=f"{PREFIX}/")
     @transact
     def handle_leave(conn: sqlite3.Connection):
         """部屋から退出"""
@@ -267,7 +267,7 @@ def register_socket_routes(socketio: SocketIO):
         available_rooms = get_available_rooms()
         emit("rooms", available_rooms, to=SYSTEM_LOBBY)
 
-    @socketio.on("message")
+    @socketio.on("message", namespace=f"{PREFIX}/")
     @transact
     def handle_message(conn: sqlite3.Connection, data):
         """テキストメッセージ受信"""

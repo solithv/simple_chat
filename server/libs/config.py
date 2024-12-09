@@ -22,3 +22,5 @@ JOIN_MESSAGES = os.getenv("JOIN_MESSAGES", 10)
 MAX_FILES = os.getenv("MAX_FILES", 20)
 LOG_SYSTEM = literal_eval(os.getenv("LOG_SYSTEM", "False").capitalize())
 FILE_FOLDER = os.getenv("FILE_FOLDER", "files")
+
+PREFIX = os.getenv("PREFIX", "")

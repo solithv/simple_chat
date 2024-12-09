@@ -3,20 +3,22 @@ import sqlite3
 from flask import Blueprint, abort, jsonify, render_template, send_file
 from libs.storage import transact
 
+from libs.config import PREFIX
+
 http_module = Blueprint("http_routes", __name__)
 
 
-@http_module.route("/")
+@http_module.route(f"{PREFIX}/")
 def main():
     return jsonify({"status": "http online"})
 
 
-@http_module.route("/test")
+@http_module.route(f"{PREFIX}/test")
 def test_client():
     return render_template("index.html")
 
 
-@http_module.get("/files/<int:id>/<filename>")
+@http_module.get(f"{PREFIX}/files/<int:id>/<filename>")
 @transact
 def get_file(conn: sqlite3.Connection, id: int, filename: str):
     """ファイルダウンロード"""
