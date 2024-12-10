@@ -11,7 +11,7 @@ import time
 import requests
 import re
 
-URL = "https://api.solithv7247.duckdns.org/"
+URL = "https://chat.solithv7247.duckdns.org/"
 # URL = "http://127.0.0.1:5000"
 
 """基底クラス"""
