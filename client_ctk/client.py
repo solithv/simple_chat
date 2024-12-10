@@ -1,5 +1,6 @@
 import base64
 from io import BytesIO
+import io
 import os
 import customtkinter
 import tkextrafont
@@ -917,6 +918,7 @@ class App(customtkinter.CTk):
                 pass
 
             elif message.get("image"):
+
                 file = filedialog.asksaveasfile(
                     mode="wb",
                     title="Save As",
@@ -925,9 +927,11 @@ class App(customtkinter.CTk):
 
                 if not file:
                     return
-
+                
                 fileByteData = base64.b64decode(message["image"])
-                file.write(fileByteData)
+                image = Image.open(io.BytesIO(fileByteData))
+                image.save(file, format="PNG")
+                file.close()
                 file.close()
 
             elif message.get("filename") and message.get("link"):
@@ -1012,11 +1016,9 @@ class App(customtkinter.CTk):
                 return
 
             for file in files:
-                image = Image.open(file)
-                imageBuffer = BytesIO()
-                image.save(imageBuffer, format="PNG")
+                fileByteData = base64.b64encode(file.read())
                 file.close()
-                fileData = base64.b64encode(imageBuffer.getvalue())
+                fileData = fileByteData.decode("utf-8")
                 self.master.wsManager.sendImage(fileData)
 
         def onAttachFile(self):

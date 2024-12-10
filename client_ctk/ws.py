@@ -25,6 +25,7 @@ class SimpleChatWSManager:
         """終了処理"""
         self.sio.emit("disconnect")
         self.sio.disconnect()
+        self.sio.connected = False
 
     def onDisconnect(self, handler):
         """終了通知"""
