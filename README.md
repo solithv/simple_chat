@@ -33,3 +33,13 @@ $ python client.py
 ```bash
 $ python client.py -h
 ```
+
+
+### GUI Client
+client_ctkフォルダ下の`requirements.txt`のライブラリをインストールしてclient.pyを実行
+```bash
+$ cd client_ctk
+$ pip install -r requirements.txt
+$ python client.py
+```
+
