@@ -81,7 +81,7 @@ class App(customtkinter.CTk):
         self.wsManager = ws.SimpleChatWSManager()
         self.wsManager.onDisconnect(self.onDisconnect)
         self.wsManager.onRooms(self.onRooms)
-        self.wsManager.onMessage(self.onSystemMessage)
+        self.wsManager.onError(self.onError)
 
         """名前決めさせる画面表示"""
         self.FirstContact(master=self)
@@ -111,15 +111,33 @@ class App(customtkinter.CTk):
         """名前決めさせる画面表示"""
         self.FirstContact(master=self)
 
+    def onError(self, message):
+        self.wsManager.offDisconnect()
+
+        for widget in self.activeWidgets:
+            widget.destroy()
+        self.activeWidgets.clear()
+
+        alert = Alert(
+            text=f"エラーが発生しました\ncode: {message["code"]}\nmessage: {message["message"]}",
+            title="Error",
+            font=self.font,
+        )
+        alert.wait()
+
+        self.isConnected = False
+        self.wsManager.disconnect()
+        self.wsManager.onDisconnect(self.onDisconnect)
+
+        """名前決めさせる画面表示"""
+        self.FirstContact(master=self)
+
     """部屋一覧を受け取ったとき"""
 
     def onRooms(self, rooms):
 
         self.rooms = rooms
         self.isRoomUpdated = True
-
-    def onSystemMessage(self, message):
-        print(message["message"])
 
     """名前決める画面"""
 
@@ -170,11 +188,14 @@ class App(customtkinter.CTk):
             """サーバに接続"""
             try:
                 self.master.wsManager.connect(URL, self.master.username)
-            except:
-                alert = Alert(text="接続ができませんでした", title="Error", font=self.master.font)
+            except Exception as e:
+                print(e)
+                alert = Alert(
+                    text="接続ができませんでした", title="Error", font=self.master.font
+                )
                 alert.wait()
                 return
-                
+
             self.master.isConnected = True
 
             """画面を消す"""
@@ -241,7 +262,7 @@ class App(customtkinter.CTk):
             self.roomContainer.grid_columnconfigure((0, 1, 2), weight=1)
 
             self.updateRoom()
-            
+
             self.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
             self.master.activeWidgets.append(self)
 
@@ -416,7 +437,7 @@ class App(customtkinter.CTk):
             submitButton.grid(row=0, column=2, padx=5, pady=5, sticky="nsew")
 
             self.updateMessages()
-            
+
             self.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
             self.master.activeWidgets.append(self)
 
@@ -490,7 +511,11 @@ class App(customtkinter.CTk):
                             hover_color="green",
                             text_color="black",
                             font=self.master.font,
-                            command=(lambda messageIndex: lambda: self.onClickMessage(messageIndex))(messageIndex),
+                            command=(
+                                lambda messageIndex: lambda: self.onClickMessage(
+                                    messageIndex
+                                )
+                            )(messageIndex),
                         )
                         messageWidget.grid(
                             row=messageIndex * 2 + 1,
@@ -541,7 +566,11 @@ class App(customtkinter.CTk):
                             hover_color="gray",
                             text_color="black",
                             font=self.master.font,
-                            command=(lambda messageIndex: lambda: self.onClickMessage(messageIndex))(messageIndex),
+                            command=(
+                                lambda messageIndex: lambda: self.onClickMessage(
+                                    messageIndex
+                                )
+                            )(messageIndex),
                         )
                         messageWidget.grid(
                             row=messageIndex * 2 + 1,
@@ -630,7 +659,11 @@ class App(customtkinter.CTk):
                             hover_color="green",
                             text_color="black",
                             font=self.master.font,
-                            command=(lambda messageIndex: lambda: self.onClickMessage(messageIndex))(messageIndex),
+                            command=(
+                                lambda messageIndex: lambda: self.onClickMessage(
+                                    messageIndex
+                                )
+                            )(messageIndex),
                         )
                         messageWidget.grid(
                             row=messageIndex * 2 + 1,
@@ -682,7 +715,11 @@ class App(customtkinter.CTk):
                             hover_color="gray",
                             text_color="black",
                             font=self.master.font,
-                            command=(lambda messageIndex: lambda: self.onClickMessage(messageIndex))(messageIndex),
+                            command=(
+                                lambda messageIndex: lambda: self.onClickMessage(
+                                    messageIndex
+                                )
+                            )(messageIndex),
                         )
                         messageWidget.grid(
                             row=messageIndex * 2 + 1,
@@ -765,7 +802,11 @@ class App(customtkinter.CTk):
                             hover_color="green",
                             text_color="black",
                             font=self.master.font,
-                            command=(lambda messageIndex: lambda: self.onClickMessage(messageIndex))(messageIndex),
+                            command=(
+                                lambda messageIndex: lambda: self.onClickMessage(
+                                    messageIndex
+                                )
+                            )(messageIndex),
                         )
                         messageWidget.grid(
                             row=messageIndex * 2 + 1,
@@ -818,7 +859,11 @@ class App(customtkinter.CTk):
                             hover_color="gray",
                             text_color="black",
                             font=self.master.font,
-                            command=(lambda messageIndex: lambda: self.onClickMessage(messageIndex))(messageIndex),
+                            command=(
+                                lambda messageIndex: lambda: self.onClickMessage(
+                                    messageIndex
+                                )
+                            )(messageIndex),
                         )
                         messageWidget.grid(
                             row=messageIndex * 2 + 1,
@@ -851,7 +896,7 @@ class App(customtkinter.CTk):
         def onQuit(self):
 
             self.master.wsManager.leave()
-            self.master.wsManager.onMessage(self.master.onSystemMessage)
+            self.master.wsManager.offMessage()
 
             self.destroy()
             self.master.activeWidgets.remove(self)
@@ -891,7 +936,7 @@ class App(customtkinter.CTk):
                     title="Save As",
                     initialfile=message["filename"],
                 )
-                
+
                 if not file:
                     return
 
@@ -945,7 +990,7 @@ class App(customtkinter.CTk):
                 font=master.font,
             )
             self.attachFile.grid(row=2, column=0, padx=5, pady=5, sticky="nsew")
-            
+
             self.grid(row=0, column=0, padx=0, pady=0, sticky="nsew")
             self.master.activeWidgets.append(self)
 

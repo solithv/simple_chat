@@ -34,6 +34,14 @@ class SimpleChatWSManager:
         """終了通知解除"""
         self.sio.on("disconnect", dummyFunc)
 
+    def onError(self, handler):
+        """部屋一覧受け取り"""
+        self.sio.on("error", handler)
+
+    def offError(self):
+        """部屋一覧受け取り解除"""
+        self.sio.on("error", dummyFunc)
+
     def onRooms(self, handler):
         """部屋一覧受け取り"""
         self.sio.on("rooms", handler)
